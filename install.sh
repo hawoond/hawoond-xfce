@@ -18,29 +18,37 @@ export PROOT_NO_SECCOMP=1   # Android 12+ seccomp 우회
 #######################################################################
 # 1) 공식 rootfs 직접 다운로드 → proot-distro 수동 등록
 #######################################################################
-echo "[3/6] Ubuntu 24.04 rootfs 수동 설치 (dpkg-reconfigure 완전 회피)"
+echo "[3/6] Ubuntu 24.04 rootfs 수동 설치 (Canonical cloud-images 경로 사용)"
 
 DIST=ubuntu-24.04
 PD_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs"
 ROOT="$PD_DIR/$DIST"
 
-# 1-1) 이미 깔려 있으면 건너뜀
+# 이미 정상 설치돼 있으면 건너뜀
 if [ -f "$ROOT/etc/os-release" ]; then
   echo " - $DIST 이미 설치되어 있어 건너뜁니다."
 else
-  echo " - rootfs 다운로드 및 전개"
-
   mkdir -p "$ROOT" "$HOME/.cache/rootfs"
   cd "$HOME/.cache/rootfs"
 
-  # Canonical cloudimg arm64 rootfs (약 190 MB)  [oai_citation:0‡images.linuxcontainers.org](https://images.linuxcontainers.org/images/ubuntu/noble/arm64/cloud/20250615_08%3A08/?utm_source=chatgpt.com)
-  ROOTFS_URL="https://images.linuxcontainers.org/images/ubuntu/noble/arm64/cloud/current/rootfs.tar.xz"
-  wget -c "$ROOTFS_URL" -O ubuntu-noble-arm64-rootfs.tar.xz
+  # ───── ① 주(Primary) 다운로드 URL ─────
+  # cloud-images.ubuntu.com 의 'current' 심볼릭 링크는 매일 최신 빌드로 갱신됨
+  ROOTFS_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-arm64-root.tar.xz"
+  # ───── ② 예비(Fallback) URL ─────
+  # images.linuxcontainers.org 의 default rootfs (타임스탬프 최신 디렉터리 중 하나)
+  FALLBACK_URL="https://images.linuxcontainers.org/images/ubuntu/noble/arm64/default/$(date +%Y%m%d)_00:00/rootfs.tar.xz"
 
-  # 1-2) rootfs 전개 (proot 필요 – 하드링크→심링크)
+  echo " - rootfs 다운로드 (Primary…)"
+  if ! wget -c "$ROOTFS_URL" -O ubuntu-noble-arm64-rootfs.tar.xz ; then
+    echo "   ▶ Primary 실패, Fallback 시도"
+    wget -c "$FALLBACK_URL" -O ubuntu-noble-arm64-rootfs.tar.xz \
+      || { echo "   ✖ rootfs 다운로드 모두 실패, 네트워크 또는 URL 확인"; exit 1; }
+  fi
+
+  echo " - rootfs 전개 중…(약 200 MB, 1-2 분 소요)"
   proot --link2symlink tar -xJf ubuntu-noble-arm64-rootfs.tar.xz -C "$ROOT"
 
-  # 1-3) proot-distro 메타파일 수동 작성
+  # proot-distro 메타파일
   echo "Ubuntu 24.04 (manual)" > "$ROOT/.dist-info"
   cat > "$ROOT/.proot-distro" <<EOF
 id=$DIST
@@ -49,7 +57,7 @@ arch=arm64
 EOF
 fi
 
-alias_name=$DIST   # 이후 단계에서 사용할 alias
+alias_name=$DIST
 
 #######################################################################
 # 2) Ubuntu 내부 패키지 설치 (XFCE·한글·VS Code 등)
