@@ -82,6 +82,7 @@ proot-distro login "ubuntu" \
     set -e
     cd /                      # ← getcwd 오류 방지
 
+    apt clean
     # apt 샌드박스 완전 해제
     echo 'APT::Sandbox::User "root";'   >  /etc/apt/apt.conf.d/00nosandbox
     echo 'APT::Sandbox::Seccomp "false";' >> /etc/apt/apt.conf.d/00nosandbox
