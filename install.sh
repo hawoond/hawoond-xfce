@@ -14,12 +14,36 @@ pkg install -y mesa vulkan-loader-android \
 
 export PROOT_NO_SECCOMP=1               # Android 12+ seccomp 우회
 
-echo "[3/6] Ubuntu 24.04(Proot) 확인"
-if proot-distro list | awk '{print $1}' | grep -Eq 'ubuntu'; then
-  echo " - ubuntu 배포판 이미 존재 ▶ 설치 단계 건너뜀"
+echo "[3/6] Ubuntu 24.04(Proot) 확인·정상 설치 보장"
+
+# proot-distro 내부 rootfs 위치
+PD_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs"
+
+# 1) 불완전 설치(디렉터리만 존재·os-release 없음) 감지 → 강제 제거
+if [ -d "$PD_DIR/ubuntu" ] && [ ! -f "$PD_DIR/ubuntu/etc/os-release" ]; then
+  echo " - 불완전한 ubuntu 설치 감지 → 제거 후 재시도"
+  proot-distro remove ubuntu || rm -rf "$PD_DIR/ubuntu"
+fi
+if [ -d "$PD_DIR/ubuntu-24.04" ] && [ ! -f "$PD_DIR/ubuntu-24.04/etc/os-release" ]; then
+  echo " - 불완전한 ubuntu-24.04 설치 감지 → 제거 후 재시도"
+  proot-distro remove ubuntu-24.04 || rm -rf "$PD_DIR/ubuntu-24.04"
+fi
+
+# 2) 설치 여부 재확인
+installed_alias=$(proot-distro list | awk '{print $1}' | grep -E '^ubuntu(-[0-9.]+)?$' || true)
+
+if [ -z "$installed_alias" ]; then
+  echo " - ubuntu 배포판 없음 ▶ 설치(최대 3회 재시도)"
+  for i in 1 2 3; do
+    echo "   ▶ 시도 $i ..."
+    proot-distro install ubuntu   && break
+    echo "   ‣ 기본 alias 실패, ubuntu-24.04 시도"
+    proot-distro install ubuntu-24.04 && break
+    echo "   ‣ 실패, 5초 후 재시도"; sleep 5
+    [ $i -eq 3 ] && { echo "   ✖ 3회 실패, 네트워크 확인 후 재실행"; exit 1; }
+  done
 else
-  echo " - ubuntu 배포판 없음 ▶ 설치 진행"
-  proot-distro install ubuntu || true       # 이미 깔려 있으면 무시
+  echo " - $installed_alias 이미 설치되어 있음"
 fi
 
 echo "[4/6] Ubuntu 내부 패키지 구성(한글·XFCE·VSCode)"
