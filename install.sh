@@ -75,29 +75,36 @@ alias_name=$DIST
 #######################################################################
 # 2) Ubuntu 내부 패키지 설치 (XFCE·한글·VS Code 등)
 #######################################################################
-echo "[4/6] Ubuntu 패키지 구성"
-rm -rf "ubuntu/var/lib/apt/lists/"*
-proot-distro login "ubuntu" --shared-tmp --bind /proc --bind /dev/shm --user root -- bash -e <<'EOF'
-  export DEBIAN_FRONTEND=noninteractive
-  apt update -y
+echo "[4/6] Ubuntu 패키지 구성 (샌드박스 해제 + /proc 바인드)"
+proot-distro login "ubuntu" \
+  --shared-tmp --bind /proc --bind /dev/shm \
+  --user root -- bash -e <<'EOF'
+    set -e
+    cd /                      # ← getcwd 오류 방지
 
-  # snapd 비활성( systemd 부재 )
-  printf 'Package: snapd\nPin: release a=*\nPin-Priority: -10\n' >/etc/apt/preferences.d/nosnap.pref
+    # apt 샌드박스 완전 해제
+    echo 'APT::Sandbox::User "root";'   >  /etc/apt/apt.conf.d/00nosandbox
+    echo 'APT::Sandbox::Seccomp "false";' >> /etc/apt/apt.conf.d/00nosandbox
 
-  # XFCE + 한글 입력 + GPU 테스트 툴 + VS Code
-  apt install -y xfce4 xfce4-terminal dbus-x11 x11-xserver-utils \
-                 ibus ibus-hangul fonts-noto-cjk fonts-nanum \
-                 locales sudo wget mesa-utils
+    export DEBIAN_FRONTEND=noninteractive
+    apt update -y
 
-  # locale: ko_KR.UTF-8 생성
-  sed -i 's/^# *ko_KR.UTF-8 UTF-8/ko_KR.UTF-8 UTF-8/' /etc/locale.gen
-  locale-gen && update-locale LANG=ko_KR.UTF-8
+    # snapd 비활성
+    printf 'Package: snapd\nPin: release a=*\nPin-Priority: -10\n' > /etc/apt/preferences.d/nosnap.pref
 
-  # VS Code arm64 .deb 설치
-  wget -qO /tmp/code.deb https://aka.ms/linux-arm64-deb && apt install -y /tmp/code.deb || true
+    # XFCE + 한글 + GPU 툴 + VSCode
+    apt install -y xfce4 xfce4-terminal dbus-x11 x11-xserver-utils \
+                   ibus ibus-hangul fonts-noto-cjk fonts-nanum \
+                   locales sudo wget mesa-utils
 
-  # D-Bus machine-id 생성(경고 예방)
-  dbus-uuidgen > /etc/machine-id || true
+    # locale
+    sed -i 's/^# *ko_KR.UTF-8 UTF-8/ko_KR.UTF-8 UTF-8/' /etc/locale.gen
+    locale-gen && update-locale LANG=ko_KR.UTF-8
+
+    # VSCode arm64
+    wget -qO /tmp/code.deb https://aka.ms/linux-arm64-deb && apt install -y /tmp/code.deb || true
+
+    dbus-uuidgen > /etc/machine-id || true
 EOF
 
 #######################################################################
@@ -127,7 +134,7 @@ export LIBGL_ALWAYS_SOFTWARE=1
 export GALLIUM_DRIVER=virpipe
 
 # Ubuntu 24.04 로그인 후 XFCE 실행
-proot-distro login ubuntu-24.04 --shared-tmp --bind /dev/shm -- bash -c '
+proot-distro login ubuntu --shared-tmp --bind /proc --bind /dev/shm -- bash -c '
   export DISPLAY=:0
   export PULSE_SERVER=127.0.0.1
   export GTK_IM_MODULE=ibus
