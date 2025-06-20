@@ -76,6 +76,11 @@ alias_name=$DIST
 # 2) Ubuntu 내부 패키지 설치 (XFCE·한글·VS Code 등)
 #######################################################################
 echo "[4/6] Ubuntu 패키지 구성 (샌드박스 해제 + /proc 바인드)"
+# ==== Ubuntu 패키지 구성 전에 캐시 정리 ====
+if [ -d "$INST_DIR/$DIST/var/lib/apt/lists" ]; then
+  echo " - 깨진 APT 목록 캐시 삭제"
+  rm -rf "$INST_DIR/$DIST/var/lib/apt/lists"/*
+fi
 proot-distro login "ubuntu" \
   --shared-tmp --bind /proc --bind /dev/shm \
   --user root -- bash -e <<'EOF'
