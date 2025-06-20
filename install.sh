@@ -76,7 +76,8 @@ alias_name=$DIST
 # 2) Ubuntu 내부 패키지 설치 (XFCE·한글·VS Code 등)
 #######################################################################
 echo "[4/6] Ubuntu 패키지 구성"
-proot-distro login "ubuntu" --shared-tmp --user root -- bash -e <<'EOF'
+rm -rf "ubuntu/var/lib/apt/lists/"*
+proot-distro login "ubuntu" --shared-tmp --bind /proc --bind /dev/shm --user root -- bash -e <<'EOF'
   export DEBIAN_FRONTEND=noninteractive
   apt update -y
 
