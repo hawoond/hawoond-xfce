@@ -54,7 +54,16 @@ else
   wget -c "$PRI_URL" -O ubuntu24-rootfs.tar.xz || wget -c "$SEC_URL" -O ubuntu24-rootfs.tar.xz
 
   echo " - rootfs 전개 (권한 안전 모드)"
-  proot --link2symlink tar -xJf ubuntu24-rootfs.tar.xz -C "$ROOT"
+  proot --link2symlink tar \
+    --numeric-owner --no-same-owner --no-same-permissions \
+    --exclude='./dev/*' \
+    -xJf ubuntu24-rootfs.tar.xz -C "$ROOT"
+
+  # 빈 /dev 디렉터리 및 최소 심볼릭 링크 구성
+  mkdir -p "$ROOT/dev"
+  for f in null zero random urandom tty; do
+    ln -s "/dev/$f" "$ROOT/dev/$f"
+  done
 
   # 메타파일 작성
   echo "Ubuntu 24.04 (manual)" > "$ROOT/.dist-info"
