@@ -18,43 +18,47 @@ export PROOT_NO_SECCOMP=1   # Android 12+ seccomp 우회
 #######################################################################
 # 1) 공식 rootfs 직접 다운로드 → proot-distro 수동 등록
 #######################################################################
-echo "[3/6] Ubuntu 24.04 rootfs 수동 설치 (Canonical cloud-images 경로 사용)"
+echo "[3/6] 사용자 홈으로 proot-distro 저장소 이동 + Ubuntu 24.04 rootfs 설치"
 
+# ── A. 사용자 홈에 전용 경로 확보 ───────────────────────────────
+CUSTOM_PD="$HOME/.proot-distro"                # ★ 완전 사용자 소유 경로
+INST_DIR="$CUSTOM_PD/installed-rootfs"
+mkdir -p "$INST_DIR"
+
+# ── B. 기존 (읽기전용) 경로를 안전하게 대체 ────────────────────
+# 만약 $PREFIX/var/lib/proot-distro 가 이미 있다면 심볼릭 링크로 교체
+SYS_PD="$PREFIX/var/lib/proot-distro"
+if [ ! -L "$SYS_PD" ]; then
+    if [ -d "$SYS_PD" ]; then
+        echo " - 기존 기본 디렉터리 백업 → $SYS_PD.bak"
+        mv "$SYS_PD" "$SYS_PD.bak.$(date +%s)"
+    fi
+    ln -s "$CUSTOM_PD" "$SYS_PD"
+fi
+
+# ── C. rootfs 다운로드·전개(404 대비 이중 URL) ─────────────────
 DIST=ubuntu-24.04
-PD_DIR="$PREFIX/var/lib/proot-distro/installed-rootfs"
-ROOT="$PD_DIR/$DIST"
+ROOT="$INST_DIR/$DIST"
 
-# 이미 정상 설치돼 있으면 건너뜀
 if [ -f "$ROOT/etc/os-release" ]; then
-  echo " - $DIST 이미 설치되어 있어 건너뜁니다."
+  echo " - $DIST 이미 설치됨"
 else
-  mkdir -p "$ROOT" "$HOME/.cache/rootfs"
-  cd "$HOME/.cache/rootfs"
+  echo " - rootfs 다운로드"
+  mkdir -p "$ROOT" "$HOME/.cache/rootfs" && cd "$HOME/.cache/rootfs"
 
-  # ───── ① 주(Primary) 다운로드 URL ─────
-  # cloud-images.ubuntu.com 의 'current' 심볼릭 링크는 매일 최신 빌드로 갱신됨
-  ROOTFS_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-arm64-root.tar.xz"
-  # ───── ② 예비(Fallback) URL ─────
-  # images.linuxcontainers.org 의 default rootfs (타임스탬프 최신 디렉터리 중 하나)
-  FALLBACK_URL="https://images.linuxcontainers.org/images/ubuntu/noble/arm64/default/$(date +%Y%m%d)_00:00/rootfs.tar.xz"
+  PRI_URL="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-arm64-root.tar.xz"
+  SEC_URL="$(curl -s https://images.linuxcontainers.org/images/ubuntu/noble/arm64/default/ \
+            | grep -oE '[0-9]{8}_[0-9]{2}:[0-9]{2}' | sort -r | head -n1 | \
+            xargs -I{} echo 'https://images.linuxcontainers.org/images/ubuntu/noble/arm64/default/{}/rootfs.tar.xz')"
 
-  echo " - rootfs 다운로드 (Primary…)"
-  if ! wget -c "$ROOTFS_URL" -O ubuntu-noble-arm64-rootfs.tar.xz ; then
-    echo "   ▶ Primary 실패, Fallback 시도"
-    wget -c "$FALLBACK_URL" -O ubuntu-noble-arm64-rootfs.tar.xz \
-      || { echo "   ✖ rootfs 다운로드 모두 실패, 네트워크 또는 URL 확인"; exit 1; }
-  fi
+  wget -c "$PRI_URL" -O ubuntu24-rootfs.tar.xz || wget -c "$SEC_URL" -O ubuntu24-rootfs.tar.xz
 
-  echo " - rootfs 전개 중…(약 200 MB, 1-2 분 소요)"
-  proot --link2symlink tar -xJf ubuntu-noble-arm64-rootfs.tar.xz -C "$ROOT"
+  echo " - rootfs 전개 (권한 안전 모드)"
+  proot --link2symlink tar -xJf ubuntu24-rootfs.tar.xz -C "$ROOT"
 
-  # proot-distro 메타파일
+  # 메타파일 작성
   echo "Ubuntu 24.04 (manual)" > "$ROOT/.dist-info"
-  cat > "$ROOT/.proot-distro" <<EOF
-id=$DIST
-version=24.04
-arch=arm64
-EOF
+  printf 'id=%s\nversion=24.04\narch=arm64\n' "$DIST" > "$ROOT/.proot-distro"
 fi
 
 alias_name=$DIST
