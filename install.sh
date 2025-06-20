@@ -26,7 +26,7 @@ if [ ! -L "$SYS_PD" ]; then
     ln -s "$CUSTOM_PD" "$SYS_PD"
 fi
 
-DIST=ubuntu
+DIST="ubuntu"
 ROOT="$INST_DIR/$DIST"
 
 if [ -f "$ROOT/etc/os-release" ]; then
