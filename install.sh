@@ -14,11 +14,12 @@ pkg install -y mesa vulkan-loader-android \
 
 export PROOT_NO_SECCOMP=1               # Android 12+ seccomp 우회
 
-echo "[3/6] Ubuntu 24.04(Proot) 설치"
-if ! proot-distro list | grep -q '^ubuntu'; then
-  proot-distro install ubuntu
+echo "[3/6] Ubuntu 24.04(Proot) 확인"
+if proot-distro list | awk '{print $1}' | grep -Eq '^ubuntu(-[0-9.]+)?$'; then
+  echo " - ubuntu 배포판 이미 존재 ▶ 설치 단계 건너뜀"
 else
-  echo " - ubuntu 이미 설치됨, 건너뜀"
+  echo " - ubuntu 배포판 없음 ▶ 설치 진행"
+  proot-distro install ubuntu || true       # 이미 깔려 있으면 무시
 fi
 
 echo "[4/6] Ubuntu 내부 패키지 구성(한글·XFCE·VSCode)"
