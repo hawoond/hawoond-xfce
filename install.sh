@@ -47,7 +47,7 @@ else
 fi
 
 echo "[4/6] Ubuntu 내부 패키지 구성(한글·XFCE·VSCode)"
-proot-distro login ubuntu --shared-tmp --user root -- bash -e <<'INCH'
+proot-distro login "$installed_alias" --shared-tmp --user root -- bash -e <<'INCH'
   export DEBIAN_FRONTEND=noninteractive
   apt update -y
   # snapd 제거(시스템d 미동작)
