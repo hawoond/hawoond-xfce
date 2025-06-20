@@ -56,7 +56,7 @@ else
   echo " - rootfs 전개 (권한 안전 모드)"
   proot --link2symlink tar \
     --numeric-owner --no-same-owner --no-same-permissions \
-    --exclude='./dev/*' \
+    --exclude='dev/*' --exclude='./dev/*' \
     -xJf ubuntu24-rootfs.tar.xz -C "$ROOT"
 
   # 빈 /dev 디렉터리 및 최소 심볼릭 링크 구성
